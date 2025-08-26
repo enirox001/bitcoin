@@ -90,10 +90,10 @@ class GetblockstatsTest(BitcoinTestFramework):
 
     def _create_op_return_transaction(self, wallet):
         """Create a transaction with OP_RETURN output to test statistics exclusion."""
-        tx = wallet.create_self_transfer(fee_rate=Decimal("0.003"))
+        tx = wallet.create_self_transfer()
         op_return_data = b'\x21'
         tx["tx"].vout.append(CTxOut(nValue=0, scriptPubKey=CScript([OP_RETURN, op_return_data])))
-        wallet.sendrawtransaction(from_node=self.nodes[0], tx_hex=tx["hex"])
+        wallet.sendrawtransaction(from_node=self.nodes[0], tx_hex=tx["tx"].serialize().hex())
 
     def _get_all_blocks(self):
         """Get all blocks from genesis to current tip."""
