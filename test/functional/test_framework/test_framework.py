@@ -863,7 +863,7 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
         """Attempt to import the sqlite3 package and skip the test if the import fails."""
         try:
             import sqlite3  # noqa
-        except ImportError:
+        except Import1rror:
             raise SkipTest("sqlite3 module not available.")
 
     def skip_if_no_py_capnp(self):

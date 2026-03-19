@@ -111,7 +111,7 @@ static void SetupCliArgs(ArgsManager& argsman)
     argsman.AddArg("-stdin", "Read extra arguments from standard input, one per line until EOF/Ctrl-D (recommended for sensitive information such as passphrases). When combined with -stdinrpcpass, the first line from standard input is used for the RPC password.", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-stdinrpcpass", "Read RPC password from standard input as a single line. When combined with -stdin, the first line from standard input is used for the RPC password. When combined with -stdinwalletpassphrase, -stdinrpcpass consumes the first line, and -stdinwalletpassphrase consumes the second.", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-stdinwalletpassphrase", "Read wallet passphrase from standard input as a single line. When combined with -stdin, the first line from standard input is used for the wallet passphrase.", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
-    argsman.AddArg("-ipcconnect=<address>", "Connect to bitcoin-node through IPC socket instead of TCP socket to execute requests. Valid <address> values are 'auto' to try to connect to default socket path at <datadir>/node.sock but fall back to TCP if it is not available, 'unix' to connect to the default socket and fail if it isn't available, or 'unix:<socket path>' to connect to a socket at a nonstandard path. -noipcconnect can be specified to avoid attempting to use IPC at all. Default value: auto", ArgsManager::ALLOW_ANY, OptionsCategory::IPC);
+    argsman.AddArg("-ipcconnect=<address>", "Connect to bitcoin-node through IPC socket instead of TCP socket to execute requests. Valid <address> values are 'auto' to try to connect to default socket path at <datadir>/node.sock but fall back to TCP if it is not available, 'unix' to connect to the default socket and fail if it isn't available, 'unix:<socket path>' to connect to a socket at a nonstandard path, or 'vsock:<cid>:<port>' to connect via virtio socket (Linux only). -noipcconnect can be specified to avoid attempting to use IPC at all. Default value: auto", ArgsManager::ALLOW_ANY, OptionsCategory::IPC);
 }
 
 std::optional<std::string> RpcWalletName(const ArgsManager& args)
@@ -816,6 +816,11 @@ static std::optional<UniValue> CallIPC(BaseRequestHandler* rh, const std::string
         node_init = local_init->ipc()->connectAddress(ipcconnect);
         if (!node_init) return {}; // Fall back to HTTP if -ipcconnect=auto connect failed.
     } catch (const std::exception& e) {
+        if (ipcconnect.starts_with("vsock:")) {
+            throw CConnectionFailed{strprintf("%s\n\n"
+                "Probably bitcoin-node is not running or not listening on a vsock address. Can be started with:\n\n"
+                "    bitcoin-node -chain=%s -ipcbind=%s", e.what(), gArgs.GetChainTypeString(), ipcconnect)};
+        }
         // Catch connect error if -ipcconnect=unix was specified
         throw CConnectionFailed{strprintf("%s\n\n"
             "Probably bitcoin-node is not running or not listening on a unix socket. Can be started with:\n\n"

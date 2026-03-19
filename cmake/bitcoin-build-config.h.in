@@ -112,4 +112,7 @@
 /* Define if QR support should be compiled in */
 #cmakedefine USE_QRCODE 1
 
+/* Define this symbol if AF_VSOCK is available */
+#cmakedefine HAVE_SOCKADDR_VM
+
 #endif //BITCOIN_CONFIG_H

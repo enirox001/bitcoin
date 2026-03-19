@@ -88,6 +88,18 @@ check_cxx_source_compiles("
   " HAVE_SOCKADDR_UN
 )
 
+check_cxx_source_compiles("
+  #include <sys/socket.h>
+  #include <linux/vm_sockets.h>
+
+  int main()
+  {
+    struct sockaddr_vm addr;
+    addr.svm_family = AF_VSOCK;
+  }
+  " HAVE_SOCKADDR_VM
+)
+
 # Check for different ways of gathering OS randomness:
 # - Linux getrandom()
 check_cxx_source_compiles("

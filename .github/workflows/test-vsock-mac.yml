@@ -1,0 +1,37 @@
+name: Test vsock on macOS
+
+on:
+  push:
+    branches: [ vsock-ipc ]
+
+jobs:
+  test-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: brew install cmake capnp
+
+      - name: Build
+        run: |
+          cmake -B build -DENABLE_IPC=ON
+          cmake --build build --target bitcoin-node bitcoin-cli -j4
+
+      - name: Install Docker Desktop
+        run: |
+          brew install --cask docker
+          open /Applications/Docker.app
+          sleep 30  # wait for Docker to start
+
+      - name: Test vsock
+        run: |
+          ./build/bin/bitcoin-node -regtest \
+            -ipcbind=vsock:4294967295:8080 \
+            -debug=ipc &
+          sleep 3
+          docker run --rm \
+            --device /dev/vsock:/dev/vsock \
+            -v $(pwd)/build/bin/bitcoin-cli:/usr/local/bin/bitcoin-cli \
+            ubuntu:22.04 \
+            bitcoin-cli -regtest -ipcconnect=vsock:2:8080 -getinfo
