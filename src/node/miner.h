@@ -14,6 +14,7 @@
 #include <txmempool.h>
 #include <util/feefrac.h>
 #include <util/time.h>
+#include <validationinterface.h>
 
 #include <cstdint>
 #include <memory>
@@ -113,6 +114,27 @@ private:
       * This check should always succeed, and is here
       * only as an extra check in case of a bug */
     bool TestChunkTransactions(const std::vector<CTxMemPoolEntryRef>& txs) const;
+};
+
+class SubmitBlockStateCatcher final : public CValidationInterface
+{
+public:
+    uint256 m_hash;
+    bool m_found{false};
+    BlockValidationState m_state;
+
+    explicit SubmitBlockStateCatcher(const uint256& hash) : m_hash{hash} {}
+
+protected:
+    void BlockChecked(const std::shared_ptr<const CBlock>& block, const BlockValidationState& state) override
+    {
+        if (block->GetHash() != m_hash) return;
+        // ProcessNewBlock emits BlockChecked synchronously while holding cs_main,
+        // so SubmitBlock can read these fields after ProcessNewBlock returns
+        // without extra synchronization.
+        m_found = true;
+        m_state = state;
+    }
 };
 
 /**

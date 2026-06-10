@@ -12,6 +12,7 @@
 #include <interfaces/mining.h>
 #include <key_io.h>
 #include <node/context.h>
+#include <node/miner.h>
 #include <pow.h>
 #include <primitives/block.h>
 #include <primitives/transaction.h>
@@ -83,22 +84,6 @@ COutPoint MineBlock(const NodeContext& node, const node::BlockCreateOptions& ass
     return valid;
 }
 
-struct BlockValidationStateCatcher : public CValidationInterface {
-    const uint256 m_hash;
-    std::optional<BlockValidationState> m_state;
-
-    BlockValidationStateCatcher(const uint256& hash)
-        : m_hash{hash},
-          m_state{} {}
-
-protected:
-    void BlockChecked(const std::shared_ptr<const CBlock>& block, const BlockValidationState& state) override
-    {
-        if (block->GetHash() != m_hash) return;
-        m_state = state;
-    }
-};
-
 COutPoint MineBlock(const NodeContext& node, std::shared_ptr<CBlock>& block)
 {
     while (!CheckProofOfWork(block->GetHash(), block->nBits, Params().GetConsensus())) {
@@ -114,14 +99,14 @@ COutPoint ProcessBlock(const NodeContext& node, const std::shared_ptr<CBlock>& b
     auto& chainman{*Assert(node.chainman)};
     const auto old_height = WITH_LOCK(chainman.GetMutex(), return chainman.ActiveHeight());
     bool new_block;
-    BlockValidationStateCatcher bvsc{block->GetHash()};
+    node::SubmitBlockStateCatcher bvsc{block->GetHash()};
     node.validation_signals->RegisterValidationInterface(&bvsc);
     const bool processed{chainman.ProcessNewBlock(block, true, true, &new_block)};
     const bool duplicate{!new_block && processed};
     assert(!duplicate);
     node.validation_signals->UnregisterValidationInterface(&bvsc);
     node.validation_signals->SyncWithValidationInterfaceQueue();
-    const bool was_valid{bvsc.m_state && bvsc.m_state->IsValid()};
+    const bool was_valid{bvsc.m_found && bvsc.m_state.IsValid()};
     assert(old_height + was_valid == WITH_LOCK(chainman.GetMutex(), return chainman.ActiveHeight()));
 
     if (was_valid) return {block->vtx[0]->GetHash(), 0};

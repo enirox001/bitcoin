@@ -358,29 +358,6 @@ void AddMerkleRootAndCoinbase(CBlock& block, CTransactionRef coinbase, uint32_t 
     block.fChecked = false;
 }
 
-namespace {
-class SubmitBlockStateCatcher final : public CValidationInterface
-{
-public:
-    uint256 m_hash;
-    bool m_found{false};
-    BlockValidationState m_state;
-
-    explicit SubmitBlockStateCatcher(const uint256& hash) : m_hash{hash} {}
-
-protected:
-    void BlockChecked(const std::shared_ptr<const CBlock>& block, const BlockValidationState& state) override
-    {
-        if (block->GetHash() != m_hash) return;
-        // ProcessNewBlock emits BlockChecked synchronously while holding cs_main,
-        // so SubmitBlock can read these fields after ProcessNewBlock returns
-        // without extra synchronization.
-        m_found = true;
-        m_state = state;
-    }
-};
-} // namespace
-
 bool SubmitBlock(ChainstateManager& chainman, const std::shared_ptr<const CBlock>& block, bool* new_block, std::string& reason, std::string& debug)
 {
     reason.clear();
