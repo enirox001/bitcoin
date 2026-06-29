@@ -17,14 +17,7 @@ void CustomBuildField(TypeList<std::map<KeyLocalType, ValueLocalType>>,
     Value&& value,
     Output&& output)
 {
-    // FIXME dededup with vector handler above
-    auto list = output.init(value.size());
-    size_t i = 0;
-    for (const auto& elem : value) {
-        BuildField(TypeList<std::pair<KeyLocalType, ValueLocalType>>(), invoke_context,
-            ListOutput<typename decltype(list)::Builds>(list, i), elem);
-        ++i;
-    }
+    BuildList(TypeList<std::pair<KeyLocalType, ValueLocalType>>(), invoke_context, output, value);
 }
 
 // Replacement for `m.emplace(piecewise_construct, t1, t2)` to work around a

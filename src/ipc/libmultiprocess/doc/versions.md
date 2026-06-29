@@ -7,8 +7,23 @@ Library versions are tracked with simple
 Versioning policy is described in the [version.h](../include/mp/version.h)
 include.
 
-## v10
+## v12
 - Current unstable version.
+- Adds an optional per-listener `max_connections` parameter to `ListenConnections()`
+  so servers can stop accepting new connections when a local connection cap is reached,
+  and resume accepting after existing connections disconnect.
+
+## [v11.0](https://github.com/bitcoin-core/libmultiprocess/commits/v11.0)
+- Tolerates unexpected exceptions in event loop `post()` callbacks.
+- Tolerates exceptions from remote destroy during cleanup in `ProxyClient`.
+- Supports primitive `std::optional` struct fields in the code generator (`mpgen`).
+- Adds `TypeName()` and improves debug log coverage for Proxy object lifecycle.
+- Updates build compatibility with recent Nix and CMake versions.
+
+## [v10.0](https://github.com/bitcoin-core/libmultiprocess/commits/v10.0)
+- Increases spawn test timeout to avoid spurious failures.
+- Uses `throwRecoverableException` instead of raw `throw` to improve runtime error messages in macOS builds.
+- Used in Bitcoin Core master branch, pulled in by [#34977](https://github.com/bitcoin/bitcoin/pull/34977). Also pulled into Bitcoin Core 31.x stable branch by [#35028](https://github.com/bitcoin/bitcoin/pull/35028).
 
 ## [v9.0](https://github.com/bitcoin-core/libmultiprocess/commits/v9.0)
 - Fixes race conditions where worker thread could be used after destruction, where getParams() could be called after request cancel, and where m_on_cancel could be called after request finishes.

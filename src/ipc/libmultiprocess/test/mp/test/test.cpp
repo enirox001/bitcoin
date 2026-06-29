@@ -34,6 +34,7 @@
 #include <string_view>
 #include <thread>
 #include <type_traits>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -141,21 +142,34 @@ KJ_TEST("Call FooInterface methods")
 
     FooStruct in;
     in.name = "name";
-    in.setint.insert(2);
-    in.setint.insert(1);
-    in.vbool.push_back(false);
-    in.vbool.push_back(true);
-    in.vbool.push_back(false);
+    in.set_int.insert(2);
+    in.set_int.insert(1);
+    in.unordered_set_int.insert(2);
+    in.unordered_set_int.insert(1);
+    in.v_bool.push_back(false);
+    in.v_bool.push_back(true);
+    in.v_bool.push_back(false);
+    in.optional_int = 3;
     FooStruct out = foo->pass(in);
     KJ_EXPECT(in.name == out.name);
-    KJ_EXPECT(in.setint.size() == out.setint.size());
-    for (auto init{in.setint.begin()}, outit{out.setint.begin()}; init != in.setint.end() && outit != out.setint.end(); ++init, ++outit) {
+    KJ_EXPECT(in.set_int.size() == out.set_int.size());
+    for (auto init{in.set_int.begin()}, outit{out.set_int.begin()}; init != in.set_int.end() && outit != out.set_int.end(); ++init, ++outit) {
         KJ_EXPECT(*init == *outit);
     }
-    KJ_EXPECT(in.vbool.size() == out.vbool.size());
-    for (size_t i = 0; i < in.vbool.size(); ++i) {
-        KJ_EXPECT(in.vbool[i] == out.vbool[i]);
+    KJ_EXPECT(in.unordered_set_int.size() == out.unordered_set_int.size());
+    for (const auto& elem : in.unordered_set_int) {
+        KJ_EXPECT(out.unordered_set_int.count(elem) == 1);
     }
+    KJ_EXPECT(in.v_bool.size() == out.v_bool.size());
+    for (size_t i = 0; i < in.v_bool.size(); ++i) {
+        KJ_EXPECT(in.v_bool[i] == out.v_bool[i]);
+    }
+    KJ_EXPECT(in.optional_int == out.optional_int);
+
+    // Additional checks for std::optional member
+    KJ_EXPECT(foo->pass(in).optional_int == 3);
+    in.optional_int.reset();
+    KJ_EXPECT(!foo->pass(in).optional_int);
 
     FooStruct err;
     try {
@@ -215,6 +229,8 @@ KJ_TEST("Call FooInterface methods")
     mut.message = "init";
     foo->passMutable(mut);
     KJ_EXPECT(mut.message == "init build pass call return read");
+
+    KJ_EXPECT(foo->passDouble(1.25) == 1.25);
 
     KJ_EXPECT(foo->passFn([]{ return 10; }) == 10);
 
@@ -427,6 +443,32 @@ KJ_TEST("Calling async IPC method, with server disconnect after cleanup")
     }
 }
 
+KJ_TEST("Destroying ProxyClient<> with destroy method after peer disconnect")
+{
+    // Regression test for bitcoin-core/libmultiprocess#219 where
+    // ~ProxyClientBase would call std::terminate if the remote destroy RPC
+    // failed during teardown.
+    //
+    // Save a callback on the server so it holds a ProxyClient<FooCallback>
+    // pointing back to this side, then disconnect. When the server is torn
+    // down, the ProxyClient<FooCallback> destructor issues a destroy RPC over
+    // the now dead connection; without the bugfix the exception escapes the
+    // noexcept destructor and aborts the process.
+
+    TestSetup setup{/*client_owns_connection=*/false};
+    ProxyClient<messages::FooInterface>* foo = setup.client.get();
+    foo->initThreadMap();
+
+    class Callback : public FooCallback
+    {
+    public:
+        int call(int arg) override { return arg; }
+    };
+
+    foo->saveCallback(std::make_shared<Callback>());
+    setup.client_disconnect();
+}
+
 KJ_TEST("Make simultaneous IPC calls on single remote thread")
 {
     TestSetup setup;
@@ -470,6 +512,7 @@ KJ_TEST("Make simultaneous IPC calls on single remote thread")
                 [&running, &tc, i](auto&& results) {
                     assert(results.getResult() == static_cast<int32_t>(100 * (i+1)));
                     running -= 1;
+                    Lock lock(tc.waiter->m_mutex);
                     tc.waiter->m_cv.notify_all();
                 }));
         }
